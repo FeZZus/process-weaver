@@ -1,6 +1,7 @@
 Turn audio process descriptions into structured process flow diagrams. Upload an audio file, get a transcript, then an extracted workflow (nodes, edges, actors, summary) rendered as an interactive diagram.
 
 ---
+# I made a video and put it in the zipped folder. Please do watch it! It's more interesting than reading all this.
 
 ## Rough project flow
 
