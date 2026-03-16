@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Server uploads (multer temp files)
+uploads/
+
+# Test coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

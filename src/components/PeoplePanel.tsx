@@ -1,30 +1,13 @@
 import { X, Users } from "lucide-react";
+import type { WorkflowActor } from "@/types/workflow";
 
 interface PeoplePanelProps {
   open: boolean;
   onClose: () => void;
+  actors: WorkflowActor[];
 }
 
-const actors = [
-  {
-    name: "Customer Service Team",
-    description: "Receives and validates incoming customer requests, handles initial triage.",
-  },
-  {
-    name: "Routing System",
-    description: "Automatically determines assignment path based on request type and complexity.",
-  },
-  {
-    name: "Specialist Team",
-    description: "Handles complex or non-standard requests requiring domain expertise.",
-  },
-  {
-    name: "Management",
-    description: "Reviews processed requests and makes final approval or rejection decisions.",
-  },
-];
-
-export function PeoplePanel({ open, onClose }: PeoplePanelProps) {
+export function PeoplePanel({ open, onClose, actors }: PeoplePanelProps) {
   if (!open) return null;
 
   return (
@@ -45,12 +28,22 @@ export function PeoplePanel({ open, onClose }: PeoplePanelProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {actors.map((actor) => (
-            <div key={actor.name} className="bg-secondary/50 border border-border rounded-lg p-4">
-              <p className="text-sm font-medium text-foreground mb-1">{actor.name}</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{actor.description}</p>
-            </div>
-          ))}
+          {actors.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No actors were detected for this process.
+            </p>
+          ) : (
+            actors.map((actor) => (
+              <div key={actor.name} className="bg-secondary/50 border border-border rounded-lg p-4">
+                <p className="text-sm font-medium text-foreground mb-1">
+                  {actor.name}
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {actor.role}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>

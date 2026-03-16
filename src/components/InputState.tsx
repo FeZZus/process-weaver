@@ -1,17 +1,48 @@
 import { FileAudio, FileText, X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 
 interface InputStateProps {
   mode: "audio" | "transcript";
-  fileName?: string;
   onRemove: () => void;
-  onProcess: (text?: string) => void;
+  onProcess: (options?: { transcript?: string; file?: File }) => void;
 }
 
-export function InputState({ mode, fileName, onRemove, onProcess }: InputStateProps) {
+export function InputState({ mode, onRemove, onProcess }: InputStateProps) {
   const [transcript, setTranscript] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  // Auto-load default test audio from public/test.mp3 on first render in audio mode
+  useEffect(() => {
+    if (mode !== "audio" || file) return;
+
+    let cancelled = false;
+
+    const loadDefaultAudio = async () => {
+      try {
+        const res = await fetch("/test.mp3");
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (cancelled) return;
+        const testFile = new File([blob], "test.mp3", { type: blob.type || "audio/mpeg" });
+        setFile(testFile);
+      } catch {
+        // swallow; user can still upload their own file
+      }
+    };
+
+    loadDefaultAudio();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, file]);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0] ?? null;
+    setFile(selected || null);
+  };
 
   return (
     <div className="flex-1 flex items-center justify-center px-8">
@@ -24,13 +55,26 @@ export function InputState({ mode, fileName, onRemove, onProcess }: InputStatePr
                   <FileAudio className="w-5 h-5 text-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">{fileName || "recording.mp3"}</p>
-                  <p className="text-xs text-muted-foreground">Audio file • ~3:24</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {file ? file.name : "No audio file selected"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {file ? "Ready to analyze" : "Choose a recorded or uploaded audio file"}
+                  </p>
                 </div>
               </div>
               <button onClick={onRemove} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            <div className="mt-4">
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={handleFileChange}
+                className="block w-full text-xs text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-secondary file:text-foreground hover:file:bg-secondary/80"
+              />
             </div>
           </div>
         ) : (
@@ -54,9 +98,17 @@ export function InputState({ mode, fileName, onRemove, onProcess }: InputStatePr
         )}
 
         <Button
-          onClick={() => onProcess(mode === "transcript" ? transcript : undefined)}
+          onClick={() =>
+            onProcess(
+              mode === "transcript"
+                ? { transcript }
+                : file
+                ? { file }
+                : undefined
+            )
+          }
           className="w-full gap-2"
-          disabled={mode === "transcript" && !transcript.trim()}
+          disabled={(mode === "transcript" && !transcript.trim()) || (mode === "audio" && !file)}
         >
           Analyze Process
           <ArrowRight className="w-4 h-4" />

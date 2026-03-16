@@ -1,14 +1,72 @@
-import { useState } from "react";
-import { Download, RefreshCw, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, RefreshCw, Loader2, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { FlowDiagram } from "./FlowDiagram";
 import { cn } from "@/lib/utils";
+import type { Workflow } from "@/types/workflow";
 
-const tabs = ["Diagram", "Summary", "Transcript"] as const;
-type Tab = typeof tabs[number];
+const tabs = ["Diagram", "Transcript"] as const;
+type Tab = (typeof tabs)[number];
 
-export function ResultsState() {
+interface ResultsStateProps {
+  workflow: Workflow | null;
+  transcript: string | null;
+  onRegenerate?: (editedSummary: string) => Promise<void>;
+}
+
+export function ResultsState({ workflow, transcript, onRegenerate }: ResultsStateProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Diagram");
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
+  const [editedSummary, setEditedSummary] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [pendingReview, setPendingReview] = useState<Set<string>>(new Set());
+
+  const togglePendingReview = (actorName: string) => {
+    setPendingReview((prev) => {
+      const next = new Set(prev);
+      if (next.has(actorName)) next.delete(actorName);
+      else next.add(actorName);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (regenerateOpen && workflow) {
+      setEditedSummary(workflow.summary);
+    }
+  }, [regenerateOpen, workflow]);
+
+  const handleRegenerateSubmit = async () => {
+    if (!onRegenerate || !editedSummary.trim()) return;
+    setIsRegenerating(true);
+    try {
+      await onRegenerate(editedSummary.trim());
+      setRegenerateOpen(false);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  if (!workflow) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-8">
+        <p className="text-sm text-muted-foreground">
+          No workflow available to display yet. Analyze a process to see results.
+        </p>
+      </div>
+    );
+  }
+
+  const decisionCount = workflow.nodes.filter((n) => n.type === "decision").length;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
@@ -30,8 +88,13 @@ export function ResultsState() {
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+            <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            onClick={() => setRegenerateOpen(true)}
+          >
             <RefreshCw className="w-3.5 h-3.5" />
             Regenerate
           </Button>
@@ -46,67 +109,149 @@ export function ResultsState() {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {activeTab === "Diagram" && (
           <div>
-            {/* Ambiguity notice */}
-            <div className="flex items-start gap-2.5 bg-secondary/50 border border-border rounded-lg p-3 mb-6 text-sm">
-              <AlertTriangle className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-              <p className="text-muted-foreground">
-                <span className="font-medium text-foreground">2 ambiguous steps detected.</span>{" "}
-                Some decision points may need manual review for accuracy.
-              </p>
-            </div>
+            <FlowDiagram nodes={workflow.nodes} edges={workflow.edges} />
 
-            <FlowDiagram />
-
-            {/* Process info */}
-            <div className="mt-8 max-w-2xl mx-auto">
-              <h2 className="text-xl font-semibold text-foreground mb-2">Customer Request Processing</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                This workflow describes how incoming customer requests are received, validated, assigned to the appropriate team, reviewed for approval, and either fulfilled or returned for revision before the customer is notified of the outcome.
-              </p>
-              <div className="flex gap-6 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Steps</span>
-                  <p className="font-semibold text-foreground">10</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Actors</span>
-                  <p className="font-semibold text-foreground">4</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Decision Points</span>
-                  <p className="font-semibold text-foreground">2</p>
+            {/* Process info: summary (left) + people (right) in 2 columns */}
+            <div className="mt-8 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left: title, summary, stats */}
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">
+                  {workflow.title}
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                  {workflow.summary}
+                </p>
+                <div className="flex gap-6 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Steps</span>
+                    <p className="font-semibold text-foreground">
+                      {workflow.nodes.length}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Actors</span>
+                    <p className="font-semibold text-foreground">
+                      {workflow.actors.length}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Decision Points</span>
+                    <p className="font-semibold text-foreground">
+                      {decisionCount}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
 
-        {activeTab === "Summary" && (
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-xl font-semibold text-foreground mb-4">Process Summary</h2>
-            <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
-              <p>
-                The customer request processing workflow begins when a customer submits a request through the online portal. The system automatically validates the input data for completeness and correctness.
-              </p>
-              <p>
-                Based on the request type, the system determines whether it can be auto-assigned to a general team or needs routing to a specialist. Both paths converge at a review stage where the assigned team processes the request.
-              </p>
-              <p>
-                An approval decision gate determines the final outcome: approved requests are fulfilled and the customer is notified, while rejected requests are returned for revision, creating a feedback loop until resolution.
-              </p>
+              {/* Right: People & Teams */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">
+                  People & Teams
+                </h3>
+                {workflow.actors.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No actors were detected for this process.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {workflow.actors.map((actor) => {
+                      const isPending = pendingReview.has(actor.name);
+                      return (
+                        <div
+                          key={actor.name}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => togglePendingReview(actor.name)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              togglePendingReview(actor.name);
+                            }
+                          }}
+                          className={cn(
+                            "group relative border border-border rounded-lg p-3 pr-9 cursor-pointer transition-colors",
+                            isPending
+                              ? "bg-secondary border-border"
+                              : "bg-secondary/50"
+                          )}
+                        >
+                          <p className="text-sm font-medium text-foreground">
+                            {actor.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {actor.role}
+                          </p>
+                          {isPending && (
+                            <span className="absolute bottom-2 right-3 text-[10px] text-muted-foreground italic">
+                              waiting for review
+                            </span>
+                          )}
+                          <Flag
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                            aria-hidden
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === "Transcript" && (
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-xl font-semibold text-foreground mb-4">Original Transcript</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">
+              Original Transcript
+            </h2>
             <div className="bg-card border border-border rounded-lg p-5 text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-              {"So basically, when a customer submits a request, the system first checks if everything is filled out correctly. Then it figures out if it can just assign it automatically or if it needs a specialist to look at it.\n\nOnce someone picks it up, they review it and decide whether to approve it. If it's good, they fulfill the request and notify the customer. If not, they send it back and the team has to take another look.\n\nThe main teams involved are the customer service team, the routing system, the specialists, and management for approvals."}
+              {transcript || "No transcript available."}
             </div>
           </div>
         )}
       </div>
+
+      {/* Regenerate dialog */}
+      <Dialog open={regenerateOpen} onOpenChange={setRegenerateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Regenerate from summary</DialogTitle>
+            <DialogDescription>
+              Edit the summary below and submit to regenerate the process flow, actors, and diagram.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={editedSummary}
+            onChange={(e) => setEditedSummary(e.target.value)}
+            placeholder="Process summary..."
+            className="min-h-[160px] resize-none text-sm"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRegenerateOpen(false)}
+              disabled={isRegenerating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRegenerateSubmit}
+              disabled={isRegenerating || !editedSummary.trim()}
+              className="gap-2"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                "Regenerate"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
