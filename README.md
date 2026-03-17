@@ -1,7 +1,7 @@
 ---
 
 
-# I made a video and put it in the zipped folder. It's way more interesting than reading all this.
+# [I made a video on all this.](https://drive.google.com/file/d/1yqNKgfloBFeqik4u7Kcp__e4jlUNyjuS/view?usp=sharing) It's way more interesting than reading this
 
 
 ---
